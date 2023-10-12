@@ -1,13 +1,15 @@
 package tests
 
 import (
+	"os"
+	"testing"
+	"time"
+
 	"github.com/corbym/gocrest/has"
 	"github.com/corbym/gocrest/is"
 	"github.com/corbym/gocrest/then"
 	"github.com/nitram509/lib-bpmn-engine/pkg/bpmn_engine"
-	"os"
-	"testing"
-	"time"
+	"github.com/nitram509/lib-bpmn-engine/pkg/spec/BPMN20"
 )
 
 type CallPath struct {
@@ -50,6 +52,21 @@ func Test_Marshal_Unmarshal_Jobs(t *testing.T) {
 	instance, err = bpmnEngine.RunOrContinueInstance(instance.GetInstanceKey())
 	then.AssertThat(t, err, is.Nil())
 	then.AssertThat(t, instance.GetState(), is.EqualTo(bpmn_engine.Active))
+}
+
+func TestAllTasksHandler(t *testing.T) {
+	// setup
+	bpmnEngine := bpmn_engine.New()
+	cp := CallPath{}
+	bpmnEngine.NewTaskHandler().Matching(func(t *BPMN20.TaskElement) bool { return true }).Handler(cp.CallPathHandler)
+
+	pi, err := bpmnEngine.LoadFromFile("../test-cases/simple_task.bpmn")
+	then.AssertThat(t, err, is.Nil())
+
+	// when
+	_, err = bpmnEngine.CreateAndRunInstance(pi.ProcessKey, nil)
+	then.AssertThat(t, err, is.Nil())
+	then.AssertThat(t, cp.CallPath, is.EqualTo("id"))
 }
 
 func Test_Marshal_Unmarshal_partially_executed_jobs_continue_where_left_of_before_marshalling(t *testing.T) {

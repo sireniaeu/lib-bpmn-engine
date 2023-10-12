@@ -11,6 +11,7 @@ const (
 	taskHandlerForType            = "TASK_HANDLER_TYPE"
 	taskHandlerForAssignee        = "TASK_HANDLER_ASSIGNEE"
 	taskHandlerForCandidateGroups = "TASK_HANDLER_CANDIDATE_GROUPS"
+	taskHandlerForAll             = "TASK_HANDLER_FOR_ALL"
 )
 
 type taskHandler struct {
@@ -48,6 +49,11 @@ type NewTaskHandlerCommand1 interface {
 	// For the handler you can specify one or more groups.
 	// If at least one matches a given user task, the handler will be called.
 	CandidateGroups(groups ...string) NewTaskHandlerCommand2
+
+	// Matching defines a handler for a given matcher function.
+	// The matcher function is called with the task element as parameter.
+	// If the matcher returns true, the handler will be called.
+	Matching(matcher func(t *BPMN20.TaskElement) bool) NewTaskHandlerCommand2
 }
 
 // NewTaskHandler registers a handler function to be called for service tasks with a given taskId
@@ -75,6 +81,13 @@ func (thc newTaskHandlerCommand) Type(taskType string) NewTaskHandlerCommand2 {
 		return (*element).GetTaskDefinitionType() == taskType
 	}
 	thc.handlerType = taskHandlerForType
+	return thc
+}
+
+// Matching implements NewTaskHandlerCommand1
+func (thc newTaskHandlerCommand) Matching(matcher func(t *BPMN20.TaskElement) bool) NewTaskHandlerCommand2 {
+	thc.matcher = matcher
+	thc.handlerType = taskHandlerForAll
 	return thc
 }
 
@@ -119,6 +132,10 @@ func (state *BpmnEngineState) findTaskHandler(element *BPMN20.TaskElement) func(
 	if (*element).GetType() == BPMN20.UserTask {
 		searchOrder = append(searchOrder, taskHandlerForAssignee, taskHandlerForCandidateGroups)
 	}
+
+	// Catch all
+	searchOrder = append(searchOrder, taskHandlerForAll)
+
 	for _, handlerType := range searchOrder {
 		for _, handler := range state.taskHandlers {
 			if handler.handlerType == handlerType {
